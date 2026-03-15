@@ -14,6 +14,7 @@ def generate_compose(num_clients: int):
                     "LOGGING_LEVEL=DEBUG",
                 ],
                 "networks": ["testing_net"],
+                "volumes": ["./server/config.ini:/config.ini:ro"]
             }
         },
         "networks": {
@@ -39,6 +40,7 @@ def generate_compose(num_clients: int):
             ],
             "networks": ["testing_net"],
             "depends_on": ["server"],
+            "volumes": ["./client/config.yaml:/config.yaml:ro"]
         }
 
     return compose
