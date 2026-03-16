@@ -23,7 +23,7 @@ if [ -z "$SERVER_PORT" ]; then
 fi
 
 # Run a temporary busybox container to send a message via netcat
-RESULT=$(docker exec $SERVER_CONTAINER sh -c "echo $TEST_MSG | nc $SERVER_IP $SERVER_PORT")
+RESULT=$(docker run --rm --network "$NETWORK" busybox sh -c "echo $TEST_MSG | nc $SERVER_IP $SERVER_PORT")
 
 if [ "$RESULT" = "$TEST_MSG" ]; then
   echo "action: test_echo_server | result: success"
