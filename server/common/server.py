@@ -10,6 +10,14 @@ class Server:
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
 
+        self._server_socket.settimeout(1)
+
+        self._running = True
+        self._client_sock = None    
+
+        signal.signal(signal.SIGINT, self.handle_signal)
+        signal.signal(signal.SIGTERM, self.handle_signal)
+
     def run(self):
         """
         Dummy Server loop
@@ -19,14 +27,12 @@ class Server:
         finishes, servers starts to accept new connections again
         """
 
-        # TODO: Modify this program to handle signal to graceful shutdown
-        # the server
-        signal.signal(signal.SIGINT, self.__graceful_shutdown)
-        signal.signal(signal.SIGTERM, self.__graceful_shutdown)    
-
-        while True:
-            client_sock = self.__accept_new_connection()
-            self.__handle_client_connection(client_sock)
+        while self._running:
+            self._client_sock = self.__accept_new_connection()
+            if self._client_sock:
+                self.__handle_client_connection(self._client_sock)
+                self._client_sock = None
+        self.__graceful_shutdown()
 
     def __handle_client_connection(self, client_sock):
         """
@@ -61,8 +67,17 @@ class Server:
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
     
-    def __graceful_shutdown(self, signum, frame):
+    def __graceful_shutdown(self):
         
-        self._server_socket.close()
-
-        sys.exit(0)
+        if self._client_sock:
+            self._client_sock.shutdown(socket.SHUT_RDWR)
+            self._client_sock.close()
+            logging.info('action: shutdown_client_socket | result: success')
+    
+        if self._server_socket:
+            self._server_socket.close()
+            logging.info("action: shutdown_server_socket | result: success")
+            
+    def handle_signal(self, signal):
+        logging.info(f'action: signal_received | result: success | signal: {signal}')
+        self._running = False
