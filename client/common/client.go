@@ -57,7 +57,6 @@ func (c *Client) createClientSocket() error {
 
 // StartClientLoop Send messages to the client until some time threshold is met
 func (c *Client) StartClientLoop() {
-
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)	
 
@@ -92,7 +91,7 @@ func (c *Client) StartClientLoop() {
 				err,
 			)
 			return
-		}.  
+		}
 
 		log.Infof("action: receive_message | result: success | client_id: %v | msg: %v",
 			c.config.ID,
