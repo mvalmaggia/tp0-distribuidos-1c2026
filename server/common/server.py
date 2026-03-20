@@ -1,6 +1,7 @@
 import socket
 import logging
-
+import signal
+import sys
 
 class Server:
     def __init__(self, port, listen_backlog):
@@ -20,6 +21,9 @@ class Server:
 
         # TODO: Modify this program to handle signal to graceful shutdown
         # the server
+        signal.signal(signal.SIGINT, self.__graceful_shutdown)
+        signal.signal(signal.SIGTERM, self.__graceful_shutdown)    
+
         while True:
             client_sock = self.__accept_new_connection()
             self.__handle_client_connection(client_sock)
@@ -56,3 +60,9 @@ class Server:
         c, addr = self._server_socket.accept()
         logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
         return c
+    
+    def __graceful_shutdown(self, signum, frame):
+        
+        self._server_socket.close()
+
+        sys.exit(0)
