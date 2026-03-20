@@ -15,8 +15,8 @@ class Server:
         self._running = True
         self._client_sock = None    
 
-        signal.signal(signal.SIGINT, self.handle_signal())
-        signal.signal(signal.SIGTERM, self.handle_signal())
+        signal.signal(signal.SIGINT, self.handle_signal)
+        signal.signal(signal.SIGTERM, self.handle_signal)
 
     def run(self):
         """
@@ -78,6 +78,6 @@ class Server:
             self._server_socket.close()
             logging.info("action: shutdown_server_socket | result: success")
 
-    def handle_signal(self):
+    def handle_signal(self, signum=None, frame=None):
         logging.info(f'action: signal_received | result: success')
         self._running = False
