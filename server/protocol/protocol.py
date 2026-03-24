@@ -1,5 +1,8 @@
 HEADER_LENGTH = 8
 
+def send_ack(socket):
+    send_message(socket, "ACK")
+
 def send_message(socket, message):
     msg_bytes = message.encode('utf-8')
     length = len(msg_bytes)
@@ -15,3 +18,4 @@ def receive_message(socket):
     length = int.from_bytes(header, byteorder='big')
     msg_bytes = socket.recv_all(length)
     return msg_bytes.decode('utf-8')
+
