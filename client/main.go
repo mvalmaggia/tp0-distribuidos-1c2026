@@ -25,6 +25,12 @@ func InitConfig() (*viper.Viper, error) {
 
 	// Configure viper to read env variables with the CLI_ prefix
 	v.AutomaticEnv()
+	v.BindEnv("NUMERO")
+	v.BindEnv("NOMBRE")
+	v.BindEnv("APELLIDO")
+	v.BindEnv("DOCUMENTO")
+	v.BindEnv("NACIMIENTO")
+
 	v.SetEnvPrefix("cli")
 	// Use a replacer to replace env variables underscores with points. This let us
 	// use nested configurations in the config file and at the same time define
@@ -110,6 +116,9 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
+	clientBet := NewClientBet(v.GetString("NOMBRE"), v.GetString("APELLIDO"), v.GetString("DOCUMENTO"), v.GetString("NACIMIENTO"), v.GetString("NUMERO"))
+
+	Printf("Client bet: %v", clientBet)
 	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
 }
