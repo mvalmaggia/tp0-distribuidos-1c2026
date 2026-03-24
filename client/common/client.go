@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	"github.com/op/go-logging"
-	// "github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/codec"
 )
 
 var log = logging.MustGetLogger("log")
@@ -57,7 +58,7 @@ func (c *Client) createClientSocket() error {
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
+func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)	
 
@@ -71,6 +72,10 @@ func (c *Client) StartClientLoop() {
 		}
 		os.Exit(0)
 	}()
+
+	encodedBet := codec.EncodeBet(clientBet)
+	log.Infof("Encoded bet: %v", encodedBet)
+	time.Sleep(20 * time.Second)
 
 	for msgID := 1; msgID <= c.config.LoopAmount && c.running; msgID++ {
 		// Create the connection the server in every loop iteration. Send an

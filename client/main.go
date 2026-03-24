@@ -110,18 +110,17 @@ func main() {
 	// Print program config with debugging purposes
 	PrintConfig(v)
 
+	clientId := v.GetString("id")
+
 	clientConfig := common.ClientConfig{
 		ServerAddress: v.GetString("server.address"),
-		ID:            v.GetString("id"),
+		ID:            clientId,
 		LoopAmount:    v.GetInt("loop.amount"),
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	clientBet := model.NewClientBet(v.GetString("NOMBRE"), v.GetString("APELLIDO"), v.GetString("DOCUMENTO"), v.GetString("NACIMIENTO"), v.GetString("NUMERO"))
-
-	log.Infof("Client bet: %v", clientBet)
-	time.Sleep(20 * time.Second)
+	clientBet := model.NewClientBet(clientId, v.GetString("NOMBRE"), v.GetString("APELLIDO"), v.GetString("DOCUMENTO"), v.GetString("NACIMIENTO"), v.GetString("NUMERO"))
 
 	client := common.NewClient(clientConfig)
-	client.StartClientLoop()
+	client.StartClientLoop(clientBet)
 }
