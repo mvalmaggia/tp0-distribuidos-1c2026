@@ -11,6 +11,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/common"
+	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
 )
 
 var log = logging.MustGetLogger("log")
@@ -116,9 +117,11 @@ func main() {
 		LoopPeriod:    v.GetDuration("loop.period"),
 	}
 
-	clientBet := NewClientBet(v.GetString("NOMBRE"), v.GetString("APELLIDO"), v.GetString("DOCUMENTO"), v.GetString("NACIMIENTO"), v.GetString("NUMERO"))
+	clientBet := model.NewClientBet(v.GetString("NOMBRE"), v.GetString("APELLIDO"), v.GetString("DOCUMENTO"), v.GetString("NACIMIENTO"), v.GetString("NUMERO"))
 
-	Printf("Client bet: %v", clientBet)
+	log.Infof("Client bet: %v", clientBet)
+	time.Sleep(20 * time.Second)
+
 	client := common.NewClient(clientConfig)
 	client.StartClientLoop()
 }

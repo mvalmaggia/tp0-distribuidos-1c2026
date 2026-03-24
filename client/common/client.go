@@ -10,8 +10,7 @@ import (
 	"syscall"
 
 	"github.com/op/go-logging"
-	"github.com/joho/godotenv"
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
+	// "github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
 )
 
 var log = logging.MustGetLogger("log")
@@ -72,21 +71,6 @@ func (c *Client) StartClientLoop() {
 		}
 		os.Exit(0)
 	}()
-
-
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	// Access the variables using standard os package
-	name := os.Getenv("NOMBRE")
-	surname := os.Getenv("APELLIDO")
-	document := os.Getenv("DOCUMENTO")
-	birthDate := os.Getenv("NACIMIENTO")
-	number := os.Getenv("NUMERO")
-
-
 
 	for msgID := 1; msgID <= c.config.LoopAmount && c.running; msgID++ {
 		// Create the connection the server in every loop iteration. Send an

@@ -2,20 +2,23 @@ package model
 
 import (
 	"time"
+	"os"
 	
 	"github.com/op/go-logging"
 )
+
+var log = logging.MustGetLogger("log")
 
 type ClientBet struct {
 	Name      string
 	Surname   string
 	Document  string
-	BirthDate string
-	Number    time.Time
+	BirthDate time.Time
+	Number    string
 }
 
-func NewClientBet(name string, surname string, document string, birthDate string, number string) *Bet {
-	birthDate, err := time.Parse("2006-01-02", nacimientoStr)
+func NewClientBet(name string, surname string, document string, birthDateStr string, number string) *ClientBet {
+	birthDate, err := time.Parse("2006-01-02", birthDateStr)
 	if err != nil {
 		log.Criticalf("Could not parse NACIMIENTO as date: %v", err)
 		os.Exit(1)
