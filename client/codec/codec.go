@@ -14,3 +14,11 @@ func EncodeBet(bet *model.ClientBet) string {
 
 	return fmt.Sprintf("%s|%s|%s|%s|%s|%s", bet.Agency, bet.Name, bet.Surname, bet.Document, date, bet.Number)
 }	
+
+func EncodeBetBatch(bets []*model.ClientBet) string {
+	var encodedBets string
+	for _, bet := range bets {
+		encodedBets += EncodeBet(bet) + "\n"
+	}
+	return encodedBets
+}
