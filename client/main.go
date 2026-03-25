@@ -117,6 +117,7 @@ func main() {
 		ID:            clientId,
 		LoopAmount:    v.GetInt("loop.amount"),
 		LoopPeriod:    v.GetDuration("loop.period"),
+		BatchMaxAmount:   v.GetInt("batch.maxAmount"),
 	}
 
 	clientBet := model.NewClientBet(clientId, v.GetString("NOMBRE"), v.GetString("APELLIDO"), v.GetString("DOCUMENTO"), v.GetString("NACIMIENTO"), v.GetString("NUMERO"))

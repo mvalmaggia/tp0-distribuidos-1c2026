@@ -6,7 +6,7 @@ import (
 	"fmt"
 )
 
-var HEADER_LENGTH = 8
+const HEADER_LENGTH = 8
 
 func writeAll(conn net.Conn, data []byte) error {
 	totalSent := 0

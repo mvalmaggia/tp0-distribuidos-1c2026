@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 	"strings"
+	"encoding/csv"
 
 	"github.com/op/go-logging"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
@@ -15,13 +16,13 @@ import (
 )
 
 var log = logging.MustGetLogger("log")
+const MAX_BATCH_BYTES = 8 * 1024
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
 	ID            string
 	ServerAddress string
-	LoopAmount    int
-	LoopPeriod    time.Duration
+	BatchMaxAmount int
 }
 
 // Client Entity that encapsulates how
@@ -75,8 +76,21 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 
 	c.createClientSocket()
 
-	encodedBet := codec.EncodeBet(clientBet)
-	if err := protocol.SendMessage(c.conn, encodedBet); err != nil  {
+	var betsPath = f"./data/agency-{c.config.ID}.csv"
+	betsFile, err := os.Open(betsPath)
+	if err != nil {
+		log.Errorf("action: open_bets_file | result: fail | client_id: %v | error: %v",
+			c.config.ID,
+			err,
+		)
+		return
+	}
+	reader := csv.NewReader(betsFile)
+	bets, err := NextBatch(reader, c.config.ID)
+
+	defer betsFile.Close()
+
+	if err := protocol.SendMessage(c.conn, bets); err != nil  {
 		log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
 			c.config.ID,
 			err,
@@ -102,4 +116,65 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 				clientBet.Number,
 			)
 	}	
+}
+
+func NextBatch(reader *csv.Reader, clientID string) ([]model.ClientBet, error) {
+	for i := 0; i < MAX_BATCH_BYTES; i++ {
+		record, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			return nil, fmt.Errorf("error reading file: %w", err)
+		}
+		
+		bet, err := parseBet(record, c.config.ID)
+		if err != nil {
+			log.Errorf("action: parse_bet | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			continue
+		}
+
+		encodedBet := codec.EncodeBet(bet)
+		// chequar si es necesario dividir en batches por ser muy grande?
+
+		if currentBatchBytes+len(encoded) > MAX_BATCH_BYTES - protocol.HEADER_SIZE {
+            break
+        }
+
+        bets = append(bets, bet)
+        currentBatchBytes += len(encoded)
+	}
+	
+	return bets, nil
+}
+
+func parseBet(record []string, clientID string) (model.ClientBet, error) {
+    // Format: FirstName LastName,LastName,ID,BirthDate,Number
+    
+    number, err := strconv.Atoi(record[4])
+    if err != nil {
+        return model.ClientBet{}, fmt.Errorf("invalid number: %w", err)
+    }
+
+    id, err := strconv.Atoi(record[2])
+    if err != nil {
+        return model.ClientBet{}, fmt.Errorf("invalid ID: %w", err)
+    }
+
+    birthdate, err := time.Parse("2006-01-02", record[3])
+    if err != nil {
+        return model.ClientBet{}, fmt.Errorf("invalid birthdate: %w", err)
+    }
+
+    return model.ClientBet{
+        Agency:    clientID,
+        Number:    number,
+        Name:      record[0],
+        Lastname:  record[1],
+        ID:        id,        
+        Birthdate: birthdate,
+    }, nil
 }
