@@ -15,3 +15,15 @@ def decode_bet(raw_message: str) -> Bet:
         birthdate=bet_fields[4],
         number=bet_fields[5]
     )
+
+def decode_bet_batch(raw_message: str) -> list[Bet]:
+    """
+    Decode a batch of bets from a raw message string.
+    """
+    bet_strings = raw_message.split("\n")
+    bets = []
+
+    for encoded_bet in bet_strings:
+        bets.append(decode_bet(encoded_bet))
+
+    return bets
