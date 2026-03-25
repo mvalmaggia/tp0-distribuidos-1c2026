@@ -55,6 +55,9 @@ class Server:
             protocol.send_ack(client_sock)
             logging.info(f'action: send_ack | result: success | ip: {addr[0]}')
 
+        except (ValueError, IndexError) as e:
+            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
+            protocol.send_message(client_sock, "ERROR")
         except OSError as e:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
         finally:

@@ -16,7 +16,8 @@ import (
 )
 
 var log = logging.MustGetLogger("log")
-const MAX_BATCH_BYTES = 8 * 1024
+
+const MAX_RETRY_ATTEMPTS = 3
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
@@ -74,10 +75,7 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 		os.Exit(0)
 	}()
 
-	c.createClientSocket()
-
-	var betsPath = f"./data/agency-{c.config.ID}.csv"
-	betsFile, err := os.Open(betsPath)
+	betsParser, err := NewBetParser(c.config.ID, "./dataset.csv")
 	if err != nil {
 		log.Errorf("action: open_bets_file | result: fail | client_id: %v | error: %v",
 			c.config.ID,
@@ -85,18 +83,16 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 		)
 		return
 	}
-
-	reader := csv.NewReader(betsFile)
-	defer betsFile.Close()
+	defer betsParser.Close()
 
 	for c.running {
-		betsBatch, err := NextBatch(reader, c.config.ID)
+		betsBatch, err := betsParser.NextBatch(c.config.BatchMaxAmount)
 		if err != nil {
 			log.Errorf("action: read_bets_batch | result: fail | client_id: %v | error: %v",
 				c.config.ID,
 				err,
 			)
-			return
+			continue
 		}
 
 		if len(betsBatch) == 0 {
@@ -104,96 +100,58 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 			break
 		}
 
-		var encodedBetsBatch = codec.EncodeBetBatch(betsBatch)
-		if err := c.createClientSocket(); err != nil {
-            continue
-        }
+		encodedBetsBatch := codec.EncodeBetBatch(betsBatch)
 
-		if err := protocol.SendMessage(c.conn, encodedBetsBatch); err != nil  {
-			log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			c.conn.Close()
-			return
-		}
-
-		msg, err := protocol.ReceiveMessage(c.conn)
-        c.conn.Close()
-        log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
-
-        if err != nil {
-            log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v",
-				clientBet.Document,
-				clientBet.Number,
-			)
-            continue
-        }
-
-		if strings.TrimSpace(response) == "ACK" {
-			log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
-                c.config.ID, len(bets))
-		}	
-	}
-}
-
-func NextBatch(reader *csv.Reader, clientID string) ([]model.ClientBet, error) {
-	for i := 0; i < MAX_BATCH_BYTES; i++ {
-		record, err := reader.Read()
-		if err != nil {
-			if err == io.EOF {
-				break
+		for attempt := 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++ {
+			if err := SendBetBatch(c, encodedBetsBatch); err != nil {
+				log.Errorf("action: send_bet | result: fail | client_id: %v | attempt: %v | error: %v",
+					c.config.ID,
+					attempt,
+					err,
+				)
+				time.Sleep(2 * time.Second)
+				continue
 			}
-			return nil, fmt.Errorf("error reading file: %w", err)
+			
+			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+
+			if err != nil {
+				log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v",
+					clientBet.Document,
+					clientBet.Number,
+				)
+				continue
+			}
+
+			if strings.TrimSpace(response) == "ACK" {
+				log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
+					c.config.ID, len(bets))
+					break
+			} else if strings.TrimSpace(response) == "ERROR" {
+				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | batch_size: %v",
+					c.config.ID, len(bets))
+					time.Sleep(2 * time.Second) 
+			}
 		}
-		
-		bet, err := parseBet(record, c.config.ID)
-		if err != nil {
-			log.Errorf("action: parse_bet | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			continue
-		}
-
-		encodedBet := codec.EncodeBet(bet)
-		// chequar si es necesario dividir en batches por ser muy grande?
-
-		if currentBatchBytes+len(encoded) > MAX_BATCH_BYTES - protocol.HEADER_SIZE {
-            break
-        }
-
-        bets = append(bets, bet)
-        currentBatchBytes += len(encoded)
 	}
-	
-	return bets, nil
 }
 
-func parseBet(record []string, clientID string) (model.ClientBet, error) {
-    // Format: FirstName LastName,LastName,ID,BirthDate,Number
-    
-    number, err := strconv.Atoi(record[4])
-    if err != nil {
-        return model.ClientBet{}, fmt.Errorf("invalid number: %w", err)
-    }
+func SendBetBatch(client *Client, encodedBetsBatch []byte) (string, error) {
+	if err := client.createClientSocket(); err != nil {
+		return "", err
+	}
 
-    id, err := strconv.Atoi(record[2])
-    if err != nil {
-        return model.ClientBet{}, fmt.Errorf("invalid ID: %w", err)
-    }
+	if err := protocol.SendMessage(client.conn, encodedBetsBatch); err != nil  {
+			log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
+				client.config.ID,
+				err,
+			)
+			client.conn.Close()
+			return "", err
+	}
 
-    birthdate, err := time.Parse("2006-01-02", record[3])
-    if err != nil {
-        return model.ClientBet{}, fmt.Errorf("invalid birthdate: %w", err)
-    }
+	msg, err := protocol.ReceiveMessage(c.conn)
+	c.conn.Close()
 
-    return model.ClientBet{
-        Agency:    clientID,
-        Number:    number,
-        Name:      record[0],
-        Lastname:  record[1],
-        ID:        id,        
-        Birthdate: birthdate,
-    }, nil
+	return msg, err
 }
