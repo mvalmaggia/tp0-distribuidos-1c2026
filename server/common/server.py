@@ -3,7 +3,7 @@ import logging
 import signal
 import sys
 import protocol.protocol as protocol
-from codec.codec import decode_bet
+from codec.codec import decode_bet_batch
 from common.utils import store_bets
 
 class Server:
@@ -46,17 +46,17 @@ class Server:
         """
         try:
             msg = protocol.receive_message(client_sock)
-            client_bet = decode_bet(msg)
+            bet_batch = decode_bet_batch(msg)
 
-            store_bets([client_bet])
-            logging.info(f'action: apuesta_almacenada | result: success | dni: {client_bet.document} | numero: {client_bet.number}')
+            store_bets(bet_batch)
+            logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch)}')
             
             addr = client_sock.getpeername()
             protocol.send_ack(client_sock)
             logging.info(f'action: send_ack | result: success | ip: {addr[0]}')
 
         except OSError as e:
-            logging.error("action: receive_message | result: fail | error: {e}")
+            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
         finally:
             client_sock.close()
 
