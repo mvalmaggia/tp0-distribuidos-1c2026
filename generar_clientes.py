@@ -39,7 +39,7 @@ def generate_compose(num_clients: int):
             "env_file": "./client/.env",
             "networks": ["testing_net"],
             "depends_on": ["server"],
-            "volumes": ["./client/config.yaml:/config.yaml:ro"]
+            "volumes": ["./client/config.yaml:/config.yaml", f"./.data/agency-{i}.csv:/dataset.csv"],
         }
 
     return compose
