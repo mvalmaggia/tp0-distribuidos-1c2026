@@ -26,7 +26,7 @@ class Server:
         Dummy Server loop
 
         Server that accept a new connections and establishes a
-        communication with a client. After client with communucation
+        communication with a client. After client with communication
         finishes, servers starts to accept new connections again
         """
 
@@ -47,10 +47,14 @@ class Server:
         try:
             msg = protocol.receive_message(client_sock)
             client_bet = decode_bet(msg)
+
             store_bets([client_bet])
             logging.info(f'action: apuesta_almacenada | result: success | dni: {client_bet.document} | numero: {client_bet.number}')
+            
             addr = client_sock.getpeername()
             protocol.send_ack(client_sock)
+            logging.info(f'action: send_ack | result: success | ip: {addr[0]}')
+
         except OSError as e:
             logging.error("action: receive_message | result: fail | error: {e}")
         finally:
