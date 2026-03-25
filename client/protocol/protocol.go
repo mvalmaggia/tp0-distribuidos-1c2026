@@ -4,13 +4,9 @@ import (
 	"io"
 	"net"
 	"fmt"
-
-	"github.com/op/go-logging"
 )
 
-var log = logging.MustGetLogger("log")
-
-HEADER_LENGTH = 8
+var HEADER_LENGTH = 8
 
 func writeAll(conn net.Conn, data []byte) error {
 	totalSent := 0
@@ -35,15 +31,17 @@ func SendMessage(conn net.Conn, message string) error {
 func ReceiveMessage(conn net.Conn) (string, error)	{
 	header := make([]byte, HEADER_LENGTH)
     if _, err := io.ReadFull(conn, header); err != nil {
-        return nil, err
+        return "", err
     }
 
-	messageLength := binary.BigEndian.Uint32(header)
-	log.Infof("Received header: %s, message length: %d", string(header), messageLength)	
+	messageLength := 0
+    if _, err := fmt.Sscanf(string(header), "%08d", &messageLength); err != nil {
+        return "", fmt.Errorf("failed to parse length header: %w", err)
+    }
 
 	messageData := make([]byte, messageLength)
 	if _, err := io.ReadFull(conn, messageData); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	return string(messageData), nil

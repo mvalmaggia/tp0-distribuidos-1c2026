@@ -5,17 +5,13 @@ def decode_bet(raw_message: str) -> Bet:
     """
     Decode a bet string into a Bet object.
     """
-    fields = {}
-    for part in raw_message.strip().split("|"):
-        if ":" in part:
-            key, value = part.split(":", 1)
-            fields[key] = value
+    bet_fields = raw_message.split("|")
 
     return Bet(
-        agency=fields.get("agency", "0"),
-        first_name=fields.get("first_name", ""),
-        last_name=fields.get("last_name", ""),
-        document=fields.get("dni", ""),
-        birthdate=fields.get("birthdate", "1900-01-01"),
-        number=fields.get("number", "0")
+        bet_fields[0],
+        bet_fields[1],
+        last_name=bet_fields[2],
+        document=bet_fields[3],
+        birthdate=bet_fields[4],
+        number=bet_fields[5]
     )

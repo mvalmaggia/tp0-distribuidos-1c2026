@@ -4,27 +4,30 @@ def send_ack(socket):
     send_message(socket, "ACK")
 
 def send_message(socket, message):
-    msg_bytes = message.encode('utf-8')
-    length = len(msg_bytes)
+    data = message.encode("utf-8")
+    length_str = f"{len(data):0{HEADER_LENGTH}}".encode("utf-8")
+    socket.sendall(length_str + data)
 
-    header = length.to_bytes(HEADER_LENGTH, byteorder='big')
-    socket.sendall(header + msg_bytes)
+def receive_message(socket) -> str:
+    """
+    Receive a message with length header.
+    """
+    # Read the header
+    header = read_bytes(socket, HEADER_LENGTH)
+    length = int(header.decode("utf-8"))
 
-def recv_all(sock, n):
-    data = bytearray()
-    while len(data) < n:
-        packet = sock.recv(n - len(data))
-        if not packet: 
-            return None 
-        data.extend(packet)
-    return data
+    # Read the payload
+    payload = read_bytes(socket, length)
+    msg = payload.decode("utf-8")
+    print(f"Received message: {msg}")
+    return payload.decode("utf-8")
 
-def receive_message(socket):
-    header = recv_all(socket, HEADER_LENGTH)
-    if not header:
-        return None
+def read_bytes(sock, length):
+    buffer = b""
+    while len(buffer) < length:
+        chunk = sock.recv(length - len(buffer))
+        if not chunk:
+            raise ConnectionError("Connection closed while reading payload")
+        buffer += chunk
 
-    length = int.from_bytes(header, byteorder='big')
-    msg_bytes = recv_all(socket, length)
-    return msg_bytes.decode('utf-8')
-
+    return buffer
