@@ -57,7 +57,10 @@ class Server:
 
         except (ValueError, IndexError) as e:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
-            protocol.send_message(client_sock, "ERROR")
+            try:
+                protocol.send_message(client_sock, "ERR")
+            except OSError:
+                pass
         except OSError as e:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
         finally:

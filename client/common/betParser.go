@@ -6,7 +6,6 @@ import (
     "io"
     "os"
     "strconv"
-    "time"
 
     "github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
     "github.com/7574-sistemas-distribuidos/docker-compose-init/client/codec"
@@ -62,7 +61,7 @@ func (l *BetParser) NextBatch(size int) ([]model.ClientBet, error) {
             continue
         }
 
-        if currentBatchBytes+len(encoded) > MAX_BATCH_BYTES - protocol.HEADER_SIZE {
+        if currentBatchBytes+len(encoded) > MAX_BATCH_BYTES - protocol.HEADER_LENGTH {
             break
         }
 
@@ -86,22 +85,17 @@ func parseBet(record []string, clientID string) (model.ClientBet, error) {
         return model.ClientBet{}, fmt.Errorf("invalid number: %w", err)
     }
 
-    id, err := strconv.Atoi(record[2])
+    document, err := strconv.Atoi(record[2])
     if err != nil {
         return model.ClientBet{}, fmt.Errorf("invalid ID: %w", err)
     }
 
-    birthdate, err := time.Parse("2006-01-02", record[3])
-    if err != nil {
-        return model.ClientBet{}, fmt.Errorf("invalid birthdate: %w", err)
-    }
-
-    return model.ClientBet{
-        Agency:    clientID,
-        Number:    number,
-        Name:      record[0],
-        Lastname:  record[1],
-        ID:        id,        
-        Birthdate: birthdate,
-    }, nil
+    return model.NewClientBet(
+        clientID,
+        record[0],
+        record[1],
+        document,
+        record[3],
+        number,
+    ), nil  
 }

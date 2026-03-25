@@ -7,10 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 	"strings"
-	"encoding/csv"
 
 	"github.com/op/go-logging"
-	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/codec"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/protocol"
 )
@@ -60,7 +58,7 @@ func (c *Client) createClientSocket() error {
 }
 
 // StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
+func (c *Client) StartClientLoop() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)	
 
@@ -103,8 +101,10 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 		encodedBetsBatch := codec.EncodeBetBatch(betsBatch)
 
 		for attempt := 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++ {
-			if err := SendBetBatch(c, encodedBetsBatch); err != nil {
-				log.Errorf("action: send_bet | result: fail | client_id: %v | attempt: %v | error: %v",
+		
+			response, err := SendBetBatch(c, encodedBetsBatch)
+			if err != nil {
+				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | attempt: %v | error: %v",
 					c.config.ID,
 					attempt,
 					err,
@@ -116,27 +116,26 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
 
 			if err != nil {
-				log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v",
-					clientBet.Document,
-					clientBet.Number,
+				log.Errorf("action: apuesta_batch_enviada | result: fail | batch_size: %v",
+					len(betsBatch),
 				)
 				continue
 			}
 
 			if strings.TrimSpace(response) == "ACK" {
 				log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
-					c.config.ID, len(bets))
+					c.config.ID, len(betsBatch))
 					break
 			} else if strings.TrimSpace(response) == "ERROR" {
 				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | batch_size: %v",
-					c.config.ID, len(bets))
+					c.config.ID, len(betsBatch))
 					time.Sleep(2 * time.Second) 
 			}
 		}
 	}
 }
 
-func SendBetBatch(client *Client, encodedBetsBatch []byte) (string, error) {
+func SendBetBatch(client *Client, encodedBetsBatch string) (string, error) {
 	if err := client.createClientSocket(); err != nil {
 		return "", err
 	}
@@ -150,8 +149,8 @@ func SendBetBatch(client *Client, encodedBetsBatch []byte) (string, error) {
 			return "", err
 	}
 
-	msg, err := protocol.ReceiveMessage(c.conn)
-	c.conn.Close()
+	msg, err := protocol.ReceiveMessage(client.conn)
+	client.conn.Close()
 
 	return msg, err
 }
