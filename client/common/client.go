@@ -85,37 +85,56 @@ func (c *Client) StartClientLoop(clientBet *model.ClientBet) {
 		)
 		return
 	}
-	reader := csv.NewReader(betsFile)
-	bets, err := NextBatch(reader, c.config.ID)
 
+	reader := csv.NewReader(betsFile)
 	defer betsFile.Close()
 
-	if err := protocol.SendMessage(c.conn, bets); err != nil  {
-		log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		c.conn.Close()
-		return
-	}
+	for c.running {
+		betsBatch, err := NextBatch(reader, c.config.ID)
+		if err != nil {
+			log.Errorf("action: read_bets_batch | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			return
+		}
 
-	response, err := protocol.ReceiveMessage(c.conn)
-	c.conn.Close()
-	if err != nil {
-		log.Errorf("action: receive_message | result: fail | client_id: %v | error: %v",
-			c.config.ID,
-			err,
-		)
-		
-		return
-	}
+		if len(betsBatch) == 0 {
+			log.Infof("action: all_bets_sent | result: success | client_id: %v", c.config.ID)
+			break
+		}
 
-	if strings.TrimSpace(response) == "ACK" {
-		log.Infof("action: apuesta_enviada | result: success | dni: %v | numero: %v",
+		var encodedBetsBatch = codec.EncodeBetBatch(betsBatch)
+		if err := c.createClientSocket(); err != nil {
+            continue
+        }
+
+		if err := protocol.SendMessage(c.conn, encodedBetsBatch); err != nil  {
+			log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			c.conn.Close()
+			return
+		}
+
+		msg, err := protocol.ReceiveMessage(c.conn)
+        c.conn.Close()
+        log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+
+        if err != nil {
+            log.Errorf("action: apuesta_enviada | result: fail | dni: %v | numero: %v",
 				clientBet.Document,
 				clientBet.Number,
 			)
-	}	
+            continue
+        }
+
+		if strings.TrimSpace(response) == "ACK" {
+			log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
+                c.config.ID, len(bets))
+		}	
+	}
 }
 
 func NextBatch(reader *csv.Reader, clientID string) ([]model.ClientBet, error) {
