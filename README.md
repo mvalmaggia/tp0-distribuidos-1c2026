@@ -1,5 +1,90 @@
 # TP0: Docker + Comunicaciones + Concurrencia
 
+# Solucion
+
+## Captura de pantalla de tests pasando
+
+![Captura de pantalla de tests pasando](tests-passing.png)
+
+## Parte 1: Introducción a Docker
+
+### Ejercicio N°1:
+Se crea un script ./generar-compose.sh que recibe por paramentro el nombre del archivo y la cantidad de clientes a crear. Ejemplo:
+
+    ./generar-compose.sh docker-compose-dev.yaml 5
+
+Dicho script .sh hace uso de un script en python llamado generar_clientes.py, que utiliza la libreria yaml para generar el archivo .yaml correspondiente para el docker compose.
+
+### Ejercicio N°2:
+Se soluciona montando volumenes con los respectivos archivos de config.yaml y config.ini en el cliente y en el servidor.
+
+### Ejercicio N°3:
+Se crea un script llamado validar-echo-server.sh, que permite verificar el correcto funcionamiento del servidor. Para realizarlo, se crea un contenedor docker "lightweight", haciendo uso de la imagen busybox, que cuenta con funcionalidades basicas, tales como netcat. Esto nos permite enviar mensajes directamente al servidor sin tener que instalar netcat en la computadora del host.
+
+### Ejercicio N°4:
+Se modifican cliente y servidor para manejar la señal SIGTERM y realizar un cierre graceful. 
+
+Se cierran correctamente sockets, archivos y otros recursos antes de finalizar, y se loguean los cierres de cada recurso.
+
+El servidor utiliza un funcion __graceful_shutdown(), que es invocada cuando se corta la ejecucion. La misma se encarga de cerrar todos los sockets abiertos y generar los correspondientes logs. Ademas, se agrega un timeout al socket del servidor, para que no se quede escuchando el socket cuando llega la señal.
+
+El cliente se "suscribe" a la señal. Cuando es recibida, se cierra la conexion con el servidor y finaliza ejecucion del mismo.
+
+## Parte 2: Repaso de Comunicaciones
+
+### Ejercicio N°5:
+Se define un protocolo de comunicación, que permite que el cliente informe al servidor sobre apuestas.
+
+La comunicación puede ser 
+    - El cliente toma los datos de apuestas de enviroment variables.
+    - Se encodean los datos de la forma "agency|name|surname|document|birthDate|number\n"
+    - Se envia el mensaje en forma de bytes agregando un header de tamaño fijo que contiene el tamaño del payload.
+    - El servidor lee el header (una cantidad fija de bytes), al saber el largo del payload, lee esa cantidad exacta del socket.
+    - El servidor devuelve un ACK al cliente.
+    - El cliente cierra la conexion.
+
+Se implementa una politica de reintentos con un maximo establecido. La misma en los siguientes ejercicios es eliminada ya que considero que podemos confiar en que los mecanismos de envio son suficientes para garantizar que lleguen en los que respecta a este trabajo practico. Seria una gran mejor a trabajar.
+
+### Ejercicio N°6:
+Ahora se adapta el protocolo ya definido para poder enviar apuestas en forma de batch.
+
+El protocolo modificado será:
+    - El cliente lee de un batch de apuestas del archivo provisto.
+    - El cliente un batch de n apuestas, divididas por "\n". Se mantiene el header con el largo del payload
+    - El servidor procesa todas la apuestas del batch y las almacena. 
+    - El servidor envia un ACK, informando que fueron recibidas.
+    - El cliente vuelve al primer paso.
+
+Los archivos son montados en el container utilizando docker volumes, lo que permite que luego persistan en ejecuciones.
+
+Ademas, se toma el parametro batch.maxAmount del archivo de configuración. De todas formas, los batches nunca pesaran mas de 8kb, esto se calcula dinamicamente cuando se generan, cortando la generación con el limite que alcance primero.
+
+### Ejercicio N°7:
+Se continua iterando sobre el protocolo que fue definido inicialmente. Por lo tanto, detallo a continuación el nuevo:
+
+    - El cliente lee un batch de apuestas y las envia con el flag BET_BATCH.
+    - El servidor almacena el batch y devuelve ACK.
+    - El cliente repite el proceso hasta el ultimo batch, que se envia con el flag BATCH_END
+    - El servidor se almacena el agency id dentro de un set de agencias que ya terminaron su carga.
+    - El cliente solicita los ganadores enviando un mensaje con el flaj GET_WINNERS
+    - El servidor:
+        - Devuelve los ganadores si todas las agencias ya subieron sus apuestas
+        - Devuelve ERROR:NOT_ALL_BATCHES_RECEIVED, si aun no se han cargado las apuestas de todas las agencias.
+    - El cliente termina ejecución si recibe respuesta o solicita los ganadores N veces mas antes de finalizar.
+
+## Parte 3: Repaso de Concurrencia
+
+### Ejercicio N°8:
+En este ejercicio se busca que el servidor pueda atender conexiones de clientes de manera concurrente. Para solucionar esto, hice uso de la libreria threading. Python presenta ciertas particularidades en su manejo de multithreading que en muchos casos hace que no sea conveniente, pero ya que en este trabajo practico tenemos un proceso que no es cpu intensive, podemos darle uso. En el caso contrario, deberiamos utilizar procesos.
+
+Para lograr concurrencia se crea un nuevo thread con cada conexion entrante. Esta es una solucion vulnerable, pero por el alcance del tp se asume que nunca seran mas de 5 clientes. Una vez se termina dicho procesamiento se hace un join de los threads que no estan "vivos".
+
+A su vez, para sincronizar lecturas sobre el archivo bets.csv y el set que se mantiene con las agencias que finalizaron su carga, se utiliza de threading.Lock().
+
+Por ultimo, en el case de que se reciba una SIGNAL que finaliza la ejecucion, se cerraran todos los sockets de clientes que el servidor mantiene en la variable client_sockets. Ademas haciendo en ultima instancia, un join de todos los threads.
+
+## Enunciado
+
 En el presente repositorio se provee un esqueleto básico de cliente/servidor, en donde todas las dependencias del mismo se encuentran encapsuladas en containers. Los alumnos deberán resolver una guía de ejercicios incrementales, teniendo en cuenta las condiciones de entrega descritas al final de este enunciado.
 
  El cliente (Golang) y el servidor (Python) fueron desarrollados en diferentes lenguajes simplemente para mostrar cómo dos lenguajes de programación pueden convivir en el mismo proyecto con la ayuda de containers, en este caso utilizando [Docker Compose](https://docs.docker.com/compose/).
