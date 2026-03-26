@@ -35,6 +35,4 @@ def encode_winners(winners: list[str]) -> str:
     """
     Encode a list of winners' documents into a string message.
     """
-    print(f"Encoding winners: {winners}")
-    print(f"Encoded winners string: {'|'.join(winners)}")
     return "|".join(winners)
