@@ -19,7 +19,6 @@ def receive_message(socket) -> str:
     # Read the payload
     payload = read_bytes(socket, length)
     msg = payload.decode("utf-8")
-    print(f"Received message: {msg}")
     return payload.decode("utf-8")
 
 def read_bytes(sock, length):
