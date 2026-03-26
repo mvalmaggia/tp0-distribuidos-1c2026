@@ -62,7 +62,6 @@ class Server:
         for a specific agency.
         """
         logging.info(f"action: get_winners_for_agency | result: in_progress | agency: {agency_id}")
-        print("ganadores por agencia:", self._winners_by_agency)
         return self._winners_by_agency.get(agency_id, [])
 
     def _handle_get_winners(self, client_sock, agency_id):
