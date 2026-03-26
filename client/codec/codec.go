@@ -20,5 +20,5 @@ func EncodeBetBatch(bets []model.ClientBet) string {
 	for _, bet := range bets {
 		encodedBets += EncodeBet(bet) + "\n"
 	}
-	return encodedBets
+	return "BET_BATCH;" + encodedBets
 }
