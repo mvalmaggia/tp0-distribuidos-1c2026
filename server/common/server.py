@@ -13,6 +13,7 @@ class Server:
 
         self._client_threads = []
         self._lock = threading.Lock()
+        self._sockets_lock = threading.Lock()
 
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -154,8 +155,9 @@ class Server:
             logging.error(f"action: apuesta_recibida | result: fail")
         finally:
             client_sock.close()
-            if client_sock in self._client_sockets:
-                self._client_sockets.remove(client_sock)
+            with self._sockets_lock:
+                if client_sock in self._client_sockets:
+                    self._client_sockets.remove(client_sock)
 
     def __accept_new_connection(self):
         """
@@ -183,7 +185,11 @@ class Server:
         Ensures that all client sockets and the server socket are properly closed when the server is shutting down.
         """
         
-        for sock in self._client_sockets:
+        with self._sockets_lock:
+            sockets_to_close = list(self._client_sockets)
+            self._client_sockets.clear()
+        
+        for sock in sockets_to_close:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
                 sock.close()
