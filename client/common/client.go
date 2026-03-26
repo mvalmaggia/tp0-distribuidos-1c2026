@@ -16,6 +16,7 @@ import (
 var log = logging.MustGetLogger("log")
 
 const MAX_RETRY_ATTEMPTS = 3
+const MAX_AMOUNT_POLLS = 5
 
 // ClientConfig Configuration used by the client
 type ClientConfig struct {
@@ -57,21 +58,25 @@ func (c *Client) createClientSocket() error {
 	return nil
 }
 
-// StartClientLoop Send messages to the client until some time threshold is met
-func (c *Client) StartClientLoop() {
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)	
+func setupSignalHandler(c *Client) {
+    sigs := make(chan os.Signal, 1)
+    signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 
-	go func() {
-		sig := <-sigChan
-		log.Infof("action: signal_received | result: in_progress | signal: %v", sig)
-		c.running = false
-		if c.conn != nil {
-			c.conn.Close()
-			log.Infof("action: shutdown_client_socket | result: success")
-		}
-		os.Exit(0)
-	}()
+    go func() {
+        sig := <-sigs
+        log.Infof("action: signal_received | result: in_progress | signal: %v", sig)
+        c.running = false
+        if c.conn != nil {
+            c.conn.Close()
+            log.Infof("action: shutdown_client_socket | result: success")
+        }
+        os.Exit(0)
+    }()
+}
+
+// StartClientLoop Send messages to the client until some time threshold is met
+func (c *Client) StartClient() {
+	setupSignalHandler(c)
 
 	betsParser, err := NewBetParser(c.config.ID, "./dataset.csv")
 	if err != nil {
@@ -95,6 +100,7 @@ func (c *Client) StartClientLoop() {
 
 		if len(betsBatch) == 0 {
 			log.Infof("action: all_bets_sent | result: success | client_id: %v", c.config.ID)
+			HandleEndOfBatch(c)
 			break
 		}
 
@@ -102,7 +108,7 @@ func (c *Client) StartClientLoop() {
 
 		for attempt := 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++ {
 		
-			response, err := SendBetBatch(c, encodedBetsBatch)
+			response, err := SendMessageToConnection(c, encodedBetsBatch)
 			if err != nil {
 				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | attempt: %v | error: %v",
 					c.config.ID,
@@ -125,32 +131,54 @@ func (c *Client) StartClientLoop() {
 			if strings.TrimSpace(response) == "ACK" {
 				log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
 					c.config.ID, len(betsBatch))
-					break
 			} else if strings.TrimSpace(response) == "ERROR" {
 				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | batch_size: %v",
 					c.config.ID, len(betsBatch))
-					time.Sleep(2 * time.Second) 
 			}
 		}
 	}
 }
 
-func SendBetBatch(client *Client, encodedBetsBatch string) (string, error) {
+func HandleEndOfBatch(c *Client) {
+
+	if err := SendMessageToConnection(c, fmt.Sprintf("BATCH_END:%s", c.config.ID)); err != nil {
+		log.Errorf("action: send_end_of_batch | result: fail | error: %v", err)
+		return
+	}
+
+    polls := 0
+    for polls < MAX_AMOUNT_POLLS {
+        if err := c.createClientSocket(); err != nil {
+            log.Errorf("action: handle_end_of_batch | result: fail | error: %v", err)
+            return
+        }
+
+        if err := protocol.SendMessage(c.conn, fmt.Sprintf("GET_WINNERS:%s", c.config.ID)); err != nil {
+            log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
+            c.conn.Close()
+            return
+        }
+
+		if err := SendMessageToConnection(c, fmt.Sprintf("GET_WINNERS:%s", c.config.ID)); err != nil {
+			log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
+			c.conn.Close()
+			return
+		}
+    }
+	log.Infof("action: consulta_ganadores | result: fail | reason: max_polls_reached")
+} 
+
+func SendMessageToConnection(client *Client, message string) (string, error) {
 	if err := client.createClientSocket(); err != nil {
 		return "", err
 	}
 
-	if err := protocol.SendMessage(client.conn, encodedBetsBatch); err != nil  {
-			log.Errorf("action: send_bet | result: fail | client_id: %v | error: %v",
-				client.config.ID,
-				err,
-			)
-			client.conn.Close()
-			return "", err
+	if err := protocol.SendMessage(client.conn, message); err != nil  {
+		return "", err
 	}
 
-	msg, err := protocol.ReceiveMessage(client.conn)
+	response, err := protocol.ReceiveMessage(client.conn)
 	client.conn.Close()
 
-	return msg, err
+	return response, err
 }
