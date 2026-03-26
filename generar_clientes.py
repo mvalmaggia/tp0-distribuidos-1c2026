@@ -11,6 +11,7 @@ def generate_compose(num_clients: int):
                 "entrypoint": "python3 /main.py",
                 "environment": [
                     "PYTHONUNBUFFERED=1",
+                    f"SERVER_EXPECTED_AGENCIES={num_clients}",
                 ],
                 "networks": ["testing_net"],
                 "volumes": ["./server/config.ini:/config.ini:ro"]
