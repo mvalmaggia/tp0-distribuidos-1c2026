@@ -12,7 +12,7 @@ import (
 func EncodeBet(bet model.ClientBet) string {
 	date := bet.BirthDate.Format("2006-01-02")
 
-	return fmt.Sprintf("%s|%s|%s|%s|%s|%s", bet.Agency, bet.Name, bet.Surname, bet.Document, date, bet.Number)
+	return fmt.Sprintf("%s|%s|%s|%d|%s|%d", bet.Agency, bet.Name, bet.Surname, bet.Document, date, bet.Number)
 }	
 
 func EncodeBetBatch(bets []model.ClientBet) string {
