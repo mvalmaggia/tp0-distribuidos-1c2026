@@ -3,7 +3,7 @@ import logging
 import signal
 import sys
 import protocol.protocol as protocol
-from codec.codec import decode_bet_batch
+from codec.codec import decode_bet_batch, encode_winners
 from common.utils import store_bets, load_bets, has_won
 
 class Server:
@@ -56,7 +56,21 @@ class Server:
         store_bets(bets)
         logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
 
-    def _handle_get_winners(self, agency_id):
+    def _get_winners_for_agency(self, agency_id: int):
+        """
+        Retrieves a list of document ids for all the winning bets
+        for a specific agency.
+        """
+        logging.info(f"action: get_winners_for_agency | result: in_progress | agency: {agency_id}")
+        return self._winners_by_agency.get(agency_id, [])
+
+    def _handle_get_winners(self, client_sock, agency_id):
+        if len(self._finished_agencies) != self._expected_agencies:
+            protocol.send_message(client_sock, "ERROR:NOT_ALL_BATCHES_RECEIVED")
+            return
+
+        winners = self._get_winners_for_agency(agency_id)
+        protocol.send_message(client_sock, encode_winners(winners))
         logging.info(f"action: send_winners | result: success | agency: {agency_id}")
 
     def _handle_end_of_batch(self, agency_id):

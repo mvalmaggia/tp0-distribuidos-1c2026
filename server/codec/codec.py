@@ -22,7 +22,7 @@ def decode_bet_batch(raw_message: str) -> list[Bet]:
     """
     if raw_message.startswith("BET_BATCH:"):
         raw_message = raw_message[len("BET_BATCH:"):]
-        
+
     bet_strings = raw_message.strip().split("\n")
     bets = []
 
@@ -31,3 +31,9 @@ def decode_bet_batch(raw_message: str) -> list[Bet]:
             bets.append(decode_bet(encoded_bet))
 
     return bets
+
+def encode_winners(winners: list[str]) -> str:
+    """
+    Encode a list of winners' documents into a string message.
+    """
+    return "|".join(winners)
