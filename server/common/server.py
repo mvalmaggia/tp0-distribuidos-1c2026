@@ -1,7 +1,7 @@
 import socket
 import logging
 import signal
-import sys
+import time
 import protocol.protocol as protocol
 from codec.codec import decode_bet_batch, encode_winners
 from common.utils import store_bets, load_bets, has_won
@@ -101,7 +101,6 @@ class Server:
             if msg.startswith("BATCH_END"):
                 agency_id = msg.split(":", 1)[1].strip()
                 self._handle_end_of_batch(agency_id)
-                return
 
             addr = client_sock.getpeername()
             protocol.send_ack(client_sock)
@@ -126,13 +125,16 @@ class Server:
         Then connection created is printed and returned
         """
 
-        # Connection arrived
         logging.info('action: accept_connections | result: in_progress')
-        try: 
-            c, addr = self._server_socket.accept()
-            logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
-        except socket.timeout:
-            return None
+        # Connection arrived
+        while self._running:
+            try: 
+                c, addr = self._server_socket.accept()
+                logging.info(f'action: accept_connections | result: success | ip: {addr[0]}')
+                time.sleep(0.5)
+                return c
+            except socket.timeout:
+                continue
         
         return c
     

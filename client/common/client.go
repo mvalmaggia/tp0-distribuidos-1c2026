@@ -154,7 +154,6 @@ func HandleEndOfBatch(c *Client) {
 		if strings.HasPrefix(response, "ERROR:") {
             errorMsg := strings.TrimPrefix(response, "ERROR:")
             if errorMsg == "NOT_ALL_BATCHES_RECEIVED" {
-                c.conn.Close()
                 polls++
                 time.Sleep(5 * time.Second)
                 continue
@@ -163,7 +162,6 @@ func HandleEndOfBatch(c *Client) {
             // Process successful response
             winners, _ := codec.DecodeWinners(response)
             log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners))
-            c.conn.Close()  
             return
         }
     }
