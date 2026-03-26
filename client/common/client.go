@@ -39,6 +39,7 @@ func NewClient(config ClientConfig) *Client {
 	client := &Client{
 		config: config,
 		running: true,
+		conn: nil,
 	}
 	return client
 }
@@ -71,7 +72,6 @@ func setupSignalHandler(c *Client) {
             c.conn.Close()
             log.Infof("action: shutdown_client_socket | result: success")
         }
-        os.Exit(0)
     }()
 }
 
@@ -109,18 +109,10 @@ func (c *Client) StartClient() {
 		
 		response, err := SendMessageToConnection(c, encodedBetsBatch)
 		if err != nil {
-			log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | error: %v",
-				c.config.ID,
-				err,
-			)
-			time.Sleep(2 * time.Second)
-			continue
-		}
-
-		if err != nil {
 			log.Errorf("action: apuesta_batch_enviada | result: fail | batch_size: %v",
 				len(betsBatch),
 			)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 
@@ -147,7 +139,6 @@ func HandleEndOfBatch(c *Client) {
 		response, err := SendMessageToConnection(c, fmt.Sprintf("GET_WINNERS:%s", c.config.ID))
 		if err != nil {
 			log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
-			c.conn.Close()
 			return
 		}
 
@@ -173,13 +164,18 @@ func SendMessageToConnection(client *Client, message string) (string, error) {
 		return "", err
 	}
 
+	defer func() {
+		if client.conn != nil {
+			client.conn.Close()
+			client.conn = nil
+		}
+	} ()
+
 	if err := protocol.SendMessage(client.conn, message); err != nil  {
-		client.conn.Close()
 		return "", err
 	}
 
 	response, err := protocol.ReceiveMessage(client.conn)
-	client.conn.Close()
 
 	return response, err
 }
