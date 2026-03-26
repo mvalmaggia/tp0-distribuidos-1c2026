@@ -79,6 +79,9 @@ func (l *BetParser) Close() {
 
 func parseBet(record []string, clientID string) (model.ClientBet, error) {
     // Format: FirstName LastName,LastName,ID,BirthDate,Number
+    if len(record) < 5 {
+        return model.ClientBet{}, fmt.Errorf("invalid record length: %d", len(record))
+    }
     
     number, err := strconv.Atoi(record[4])
     if err != nil {

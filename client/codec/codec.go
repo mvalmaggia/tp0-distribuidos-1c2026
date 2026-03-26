@@ -17,11 +17,13 @@ func EncodeBet(bet model.ClientBet) string {
 }	
 
 func EncodeBetBatch(bets []model.ClientBet) string {
-	var encodedBets string
-	for _, bet := range bets {
-		encodedBets += EncodeBet(bet) + "\n"
-	}
-	return "BET_BATCH\n" + encodedBets
+    encodedBets := make([]string, len(bets))
+    
+    for i, bet := range bets {
+        encodedBets[i] = EncodeBet(bet)
+    }
+
+    return "BET_BATCH\n" + strings.Join(encodedBets, "\n")
 }
 
 func DecodeWinners(encoded string) ([]int, error) {

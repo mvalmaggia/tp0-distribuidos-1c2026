@@ -17,7 +17,6 @@ import (
 
 var log = logging.MustGetLogger("log")
 
-const MAX_RETRY_ATTEMPTS = 3
 const MAX_AMOUNT_POLLS = 5
 
 // ClientConfig Configuration used by the client
@@ -107,36 +106,30 @@ func (c *Client) StartClient() {
 		}
 
 		encodedBetsBatch := codec.EncodeBetBatch(betsBatch)
-
-		for attempt := 1; attempt <= MAX_RETRY_ATTEMPTS; attempt++ {
 		
-			response, err := SendMessageToConnection(c, encodedBetsBatch)
-			if err != nil {
-				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | attempt: %v | error: %v",
-					c.config.ID,
-					attempt,
-					err,
-				)
-				time.Sleep(2 * time.Second)
-				continue
-			}
-			
-			log.Infof("action: close_connection | result: success | client_id: %v", c.config.ID)
+		response, err := SendMessageToConnection(c, encodedBetsBatch)
+		if err != nil {
+			log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | error: %v",
+				c.config.ID,
+				err,
+			)
+			time.Sleep(2 * time.Second)
+			continue
+		}
 
-			if err != nil {
-				log.Errorf("action: apuesta_batch_enviada | result: fail | batch_size: %v",
-					len(betsBatch),
-				)
-				continue
-			}
+		if err != nil {
+			log.Errorf("action: apuesta_batch_enviada | result: fail | batch_size: %v",
+				len(betsBatch),
+			)
+			continue
+		}
 
-			if strings.TrimSpace(response) == "ACK" {
-				log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
-					c.config.ID, len(betsBatch))
-			} else if strings.TrimSpace(response) == "ERROR" {
-				log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | batch_size: %v",
-					c.config.ID, len(betsBatch))
-			}
+		if strings.TrimSpace(response) == "ACK" {
+			log.Infof("action: apuesta_batch_enviada | result: success | client_id: %v | batch_size: %v",
+				c.config.ID, len(betsBatch))
+		} else if strings.TrimSpace(response) == "ERROR" {
+			log.Errorf("action: apuesta_batch_enviada | result: fail | client_id: %v | batch_size: %v",
+				c.config.ID, len(betsBatch))
 		}
 	}
 }
@@ -183,6 +176,7 @@ func SendMessageToConnection(client *Client, message string) (string, error) {
 	}
 
 	if err := protocol.SendMessage(client.conn, message); err != nil  {
+		client.conn.Close()
 		return "", err
 	}
 

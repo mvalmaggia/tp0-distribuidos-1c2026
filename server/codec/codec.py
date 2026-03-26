@@ -6,7 +6,6 @@ def decode_bet(raw_message: str) -> Bet:
     Decode a bet string into a Bet object.
     """
     bet_fields = raw_message.split("|")
-
     return Bet(
         bet_fields[0],
         bet_fields[1],
@@ -20,8 +19,8 @@ def decode_bet_batch(raw_message: str) -> list[Bet]:
     """
     Decode a batch of bets from a raw message string.
     """
-    if raw_message.startswith("BET_BATCH:"):
-        raw_message = raw_message[len("BET_BATCH:"):]
+    if raw_message.startswith("BET_BATCH\n"):
+        raw_message = raw_message[len("BET_BATCH\n"):]
 
     bet_strings = raw_message.strip().split("\n")
     bets = []
