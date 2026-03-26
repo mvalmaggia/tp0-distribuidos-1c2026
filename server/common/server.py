@@ -65,6 +65,10 @@ class Server:
 
 
     def _get_winners_by_agency(self):
+        """
+        Retrieves dictiornary with agency ids as keys and list of document ids as values
+        for all the winning bets stored in the STORAGE_FILEPATH file.
+        """
         self._winners_by_agency = {}
         bets = load_bets()
         for bet in bets:
@@ -75,6 +79,9 @@ class Server:
                 self._winners_by_agency[agency].append(bet.document)
 
     def _handle_batch_bet(self, encoded_msg):
+        """
+        Handle a batch of bets received from a client. The batch is decoded and stored in the server's storage.
+        """
         bets = decode_bet_batch(encoded_msg)
 
         with self._lock:
@@ -91,6 +98,11 @@ class Server:
         return self._winners_by_agency.get(agency_id, [])
 
     def _handle_get_winners(self, client_sock, agency_id):
+        """
+        Handle a request to get the winners for a specific agency. If not all batches have been received, 
+        an error message is sent to the client. Otherwise, the list of winners for the requested agency 
+        is sent back to the client.
+        """
         with self._lock:
             if len(self._finished_agencies) != self._expected_agencies:
                 protocol.send_message(client_sock, "ERROR:NOT_ALL_BATCHES_RECEIVED")
@@ -101,6 +113,10 @@ class Server:
             logging.info(f"action: send_winners | result: success | agency: {agency_id}")
 
     def _handle_end_of_batch(self, agency_id):
+        """
+        Handle the end of a batch received from a client. The agency id is added to the set of 
+        finished agencies.
+        """
         with self._lock:
             self._finished_agencies.add(agency_id)
             logging.info(f"action: batch_end_received | result: success | agency: {agency_id}")
@@ -163,6 +179,9 @@ class Server:
         return None
     
     def __graceful_shutdown(self):
+        """
+        Ensures that all client sockets and the server socket are properly closed when the server is shutting down.
+        """
         
         for sock in self._client_sockets:
             try:
@@ -177,5 +196,8 @@ class Server:
             logging.info("action: shutdown_server_socket | result: success")
 
     def handle_signal(self, signum=None, frame=None):
+        """
+        Handle termination signals (SIGINT, SIGTERM) to allow for graceful shutdown of the server.
+        """
         logging.info(f'action: signal_received | result: success')
         self._running = False

@@ -18,6 +18,7 @@ type ClientBet struct {
 	Number    int
 }
 
+// NewClientBet creates a new ClientBet instance from the provided parameters.
 func NewClientBet(agency string, name string, surname string, document int, birthDateStr string, number int) ClientBet {
 	birthDate, err := time.Parse("2006-01-02", birthDateStr)
 	if err != nil {

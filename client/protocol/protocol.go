@@ -8,6 +8,7 @@ import (
 
 const HEADER_LENGTH = 8
 
+// writeAll writes all data to the connection. It ensures that all bytes are sent, even if multiple Write calls are needed.
 func writeAll(conn net.Conn, data []byte) error {
 	totalSent := 0
     for totalSent < len(data) {
@@ -20,6 +21,7 @@ func writeAll(conn net.Conn, data []byte) error {
     return nil
 }
 
+// SendMessage sends a length-prefixed message over the connection.
 func SendMessage(conn net.Conn, message string) error {
 	data := []byte(message)
     header := []byte(fmt.Sprintf("%08d", len(data))) // 8-byte ASCII length
@@ -28,6 +30,7 @@ func SendMessage(conn net.Conn, message string) error {
     return writeAll(conn, fullMessage)
 }
 
+// ReceiveMessage reads a length-prefixed message from the connection and returns it as a string.
 func ReceiveMessage(conn net.Conn) (string, error)	{
 	header := make([]byte, HEADER_LENGTH)
     if _, err := io.ReadFull(conn, header); err != nil {

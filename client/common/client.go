@@ -126,6 +126,8 @@ func (c *Client) StartClient() {
 	}
 }
 
+// HandleEndOfBatch is called when the client has sent all its bets. It notifies the server that the batch has ended and then
+// polls the server for the winners until a response is received or a maximum number of polls is reached.
 func HandleEndOfBatch(c *Client) {
 
 	_, err := SendMessageToConnection(c, fmt.Sprintf("BATCH_END:%s", c.config.ID))
@@ -159,6 +161,7 @@ func HandleEndOfBatch(c *Client) {
 	log.Infof("action: consulta_ganadores | result: fail | reason: max_polls_reached")
 } 
 
+// SendMessageToConnection is a helper function that creates a client socket, sends a message, and receives the response. It ensures that the connection is properly closed after the operation.
 func SendMessageToConnection(client *Client, message string) (string, error) {
 	if err := client.createClientSocket(); err != nil {
 		return "", err

@@ -1,9 +1,15 @@
 HEADER_LENGTH = 8
 
 def send_ack(socket):
+    """
+    Send ACK back to connection
+    """
     send_message(socket, "ACK")
 
 def send_message(socket, message):
+    """
+    Send a message with a length header.
+    """
     data = message.encode("utf-8")
     length_str = f"{len(data):0{HEADER_LENGTH}}".encode("utf-8")
     socket.sendall(length_str + data)
@@ -22,6 +28,9 @@ def receive_message(socket) -> str:
     return payload.decode("utf-8")
 
 def read_bytes(sock, length):
+    """
+    Read a specific number of bytes from a socket.   
+    """
     buffer = b""
     while len(buffer) < length:
         chunk = sock.recv(length - len(buffer))
