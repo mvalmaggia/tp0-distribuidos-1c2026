@@ -46,10 +46,16 @@ class Server:
         """
         try:
             msg = protocol.receive_message(client_sock)
-            bet_batch = decode_bet_batch(msg)
+            if msg.startswith("BET_BATCH"):
+                logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch)}')
+                bet_batch = decode_bet_batch(msg)
+                store_bets(bet_batch)
 
-            store_bets(bet_batch)
-            logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch)}')
+            if msg.startswith("GET_WINNERS"):
+                logging.info(f'action: consulta_ganadores | result: success')
+            
+            if msg.startswith("BATCH_END"):
+                logging.info(f'action: fin_de_lote_recibido | result: success')
             
             addr = client_sock.getpeername()
             protocol.send_ack(client_sock)
@@ -58,7 +64,7 @@ class Server:
         except (ValueError, IndexError) as e:
             logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
             try:
-                protocol.send_message(client_sock, "ERR")
+                protocol.send_message(client_sock, "ERROR")
             except OSError:
                 pass
         except OSError as e:
