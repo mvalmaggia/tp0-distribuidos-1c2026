@@ -37,6 +37,18 @@ class Server:
                 self._client_sock = None
         self.__graceful_shutdown()
 
+    def _handle_batch_bet(self, encoded_msg):
+        bets = decode_bet_batch(encoded_msg)
+
+        store_bets(bets)
+        logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
+
+    def _handle_get_winners(self, agency_id):
+        logging.info(f"action: send_winners | result: success | agency: {agency_id}")
+
+    def _handle_end_of_batch(self, agency_id):
+        logging.info(f"action: batch_end_received | result: success | agency: {agency_id}")
+
     def __handle_client_connection(self, client_sock):
         """
         Read message from a specific client socket and closes the socket
@@ -47,16 +59,16 @@ class Server:
         try:
             msg = protocol.receive_message(client_sock)
             if msg.startswith("BET_BATCH"):
-                logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bet_batch)}')
-                bet_batch = decode_bet_batch(msg)
-                store_bets(bet_batch)
+                self._handle_batch_bet(msg)
 
             if msg.startswith("GET_WINNERS"):
-                logging.info(f'action: consulta_ganadores | result: success')
+                agency_id = msg.split(":", 1)[1].strip()
+                self._handle_get_winners(agency_id)
             
             if msg.startswith("BATCH_END"):
-                logging.info(f'action: fin_de_lote_recibido | result: success')
-            
+                agency_id = msg.split(":", 1)[1].strip()
+                self._handle_end_of_batch(agency_id)
+
             addr = client_sock.getpeername()
             protocol.send_ack(client_sock)
             logging.info(f'action: send_ack | result: success | ip: {addr[0]}')

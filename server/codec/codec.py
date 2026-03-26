@@ -20,6 +20,9 @@ def decode_bet_batch(raw_message: str) -> list[Bet]:
     """
     Decode a batch of bets from a raw message string.
     """
+    if raw_message.startswith("BET_BATCH:"):
+        raw_message = raw_message[len("BET_BATCH:"):]
+        
     bet_strings = raw_message.strip().split("\n")
     bets = []
 
