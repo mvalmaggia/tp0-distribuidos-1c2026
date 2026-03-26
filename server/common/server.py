@@ -4,14 +4,17 @@ import signal
 import sys
 import protocol.protocol as protocol
 from codec.codec import decode_bet_batch
-from common.utils import store_bets
+from common.utils import store_bets, load_bets, has_won
 
 class Server:
-    def __init__(self, port, listen_backlog):
+    def __init__(self, port, listen_backlog, expected_agencies=5):
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
         self._server_socket.listen(listen_backlog)
+        self._finished_agencies = set()
+        self._expected_agencies = expected_agencies
+        self._winners_by_agency = {}
 
         self._server_socket.settimeout(1)
 
@@ -37,6 +40,16 @@ class Server:
                 self._client_sock = None
         self.__graceful_shutdown()
 
+    def _get_winners_by_agency(self):
+        self._winners_by_agency = {}
+        bets = load_bets()
+        for bet in bets:
+            if has_won(bet):
+                agency = bet.agency
+                if agency not in self._winners_by_agency:
+                    self._winners_by_agency[agency] = []
+                self._winners_by_agency[agency].append(bet.document)
+
     def _handle_batch_bet(self, encoded_msg):
         bets = decode_bet_batch(encoded_msg)
 
@@ -47,7 +60,12 @@ class Server:
         logging.info(f"action: send_winners | result: success | agency: {agency_id}")
 
     def _handle_end_of_batch(self, agency_id):
+        self._finished_agencies.add(agency_id)
         logging.info(f"action: batch_end_received | result: success | agency: {agency_id}")
+
+        if len(self._finished_agencies) >= self._expected_agencies:
+            logging.info("action: sorteo | result: success")
+            self._get_winners_by_agency()
 
     def __handle_client_connection(self, client_sock):
         """
