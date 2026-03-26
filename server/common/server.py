@@ -95,7 +95,7 @@ class Server:
 
             if msg.startswith("GET_WINNERS"):
                 agency_id = msg.split(":", 1)[1].strip()
-                self._handle_get_winners(agency_id)
+                self._handle_get_winners(client_sock, agency_id)
             
             if msg.startswith("BATCH_END"):
                 agency_id = msg.split(":", 1)[1].strip()
@@ -106,13 +106,13 @@ class Server:
             logging.info(f'action: send_ack | result: success | ip: {addr[0]}')
 
         except (ValueError, IndexError) as e:
-            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
+            logging.error(f"action: apuesta_recibida | result: fail")
             try:
                 protocol.send_message(client_sock, "ERROR")
             except OSError:
                 pass
         except OSError as e:
-            logging.error(f"action: apuesta_recibida | result: fail | cantidad: {len(bet_batch)}")
+            logging.error(f"action: apuesta_recibida | result: fail")
         finally:
             client_sock.close()
 

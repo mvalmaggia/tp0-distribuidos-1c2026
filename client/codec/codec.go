@@ -2,6 +2,7 @@ package codec
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/model"
 )
@@ -21,4 +22,18 @@ func EncodeBetBatch(bets []model.ClientBet) string {
 		encodedBets += EncodeBet(bet) + "\n"
 	}
 	return "BET_BATCH\n" + encodedBets
+}
+
+func DecodeWinners(encoded string) ([]int, error) {
+    if strings.TrimSpace(encoded) == "" {
+        return []int{}, nil
+    }
+
+    parts := strings.Split(encoded, "|")
+    dnis := make([]int, len(parts))
+
+    for i, part := range parts {
+        fmt.Sscanf(strings.TrimSpace(part), "%d", &dnis[i])
+    }
+    return dnis, nil
 }

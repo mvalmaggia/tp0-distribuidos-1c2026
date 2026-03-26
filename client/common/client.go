@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 	"strings"
+	"fmt"
+
 
 	"github.com/op/go-logging"
 	"github.com/7574-sistemas-distribuidos/docker-compose-init/client/codec"
@@ -141,29 +143,36 @@ func (c *Client) StartClient() {
 
 func HandleEndOfBatch(c *Client) {
 
-	if err := SendMessageToConnection(c, fmt.Sprintf("BATCH_END:%s", c.config.ID)); err != nil {
+	_, err := SendMessageToConnection(c, fmt.Sprintf("BATCH_END:%s", c.config.ID))
+	if err != nil {
 		log.Errorf("action: send_end_of_batch | result: fail | error: %v", err)
 		return
 	}
 
     polls := 0
     for polls < MAX_AMOUNT_POLLS {
-        if err := c.createClientSocket(); err != nil {
-            log.Errorf("action: handle_end_of_batch | result: fail | error: %v", err)
-            return
-        }
-
-        if err := protocol.SendMessage(c.conn, fmt.Sprintf("GET_WINNERS:%s", c.config.ID)); err != nil {
-            log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
-            c.conn.Close()
-            return
-        }
-
-		if err := SendMessageToConnection(c, fmt.Sprintf("GET_WINNERS:%s", c.config.ID)); err != nil {
+		response, err := SendMessageToConnection(c, fmt.Sprintf("GET_WINNERS:%s", c.config.ID))
+		if err != nil {
 			log.Errorf("action: consulta_ganadores | result: fail | error: %v", err)
 			c.conn.Close()
 			return
 		}
+
+		if strings.HasPrefix(response, "ERROR:") {
+            errorMsg := strings.TrimPrefix(response, "ERROR:")
+            if errorMsg == "NOT_ALL_BATCHES_RECEIVED" {
+                c.conn.Close()
+                polls++
+                time.Sleep(5 * time.Second)
+                continue
+            }
+        } else {
+            // Process successful response
+            winners, _ := codec.DecodeWinners(response)
+            log.Infof("action: consulta_ganadores | result: success | cant_ganadores: %d", len(winners))
+            c.conn.Close()  
+            return
+        }
     }
 	log.Infof("action: consulta_ganadores | result: fail | reason: max_polls_reached")
 } 
