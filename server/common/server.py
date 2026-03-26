@@ -2,12 +2,18 @@ import socket
 import logging
 import signal
 import time
+import threading
+
 import protocol.protocol as protocol
 from codec.codec import decode_bet_batch, encode_winners
 from common.utils import store_bets, load_bets, has_won
 
 class Server:
     def __init__(self, port, listen_backlog, expected_agencies=5):
+
+        self._client_threads = []
+        self._lock = threading.Lock()
+
         # Initialize server socket
         self._server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self._server_socket.bind(('', port))
@@ -19,7 +25,7 @@ class Server:
         self._server_socket.settimeout(1)
 
         self._running = True
-        self._client_sock = None    
+        self._client_sockets = []    
 
         signal.signal(signal.SIGINT, self.handle_signal)
         signal.signal(signal.SIGTERM, self.handle_signal)
@@ -29,16 +35,34 @@ class Server:
         Dummy Server loop
 
         Server that accept a new connections and establishes a
-        communication with a client. After client with communication
+        communication with a client. After client with communucation
         finishes, servers starts to accept new connections again
         """
 
         while self._running:
-            self._client_sock = self.__accept_new_connection()
-            if self._client_sock:
-                self.__handle_client_connection(self._client_sock)
-                self._client_sock = None
+            client_sock = self.__accept_new_connection()
+            if client_sock:
+                t = threading.Thread(
+                    target=self.__handle_client_connection, 
+                    args=(client_sock,)
+                )
+                t.start()
+                self._client_threads.append(t)
+                self._client_sockets.append(client_sock)
+            
+            alive_threads = []
+            for t in self._client_threads:
+                if t.is_alive():
+                    alive_threads.append(t)
+                else:
+                    t.join()
+            self._client_threads = alive_threads
+
         self.__graceful_shutdown()
+
+        for t in self._client_threads:
+            t.join()
+
 
     def _get_winners_by_agency(self):
         self._winners_by_agency = {}
@@ -53,7 +77,9 @@ class Server:
     def _handle_batch_bet(self, encoded_msg):
         bets = decode_bet_batch(encoded_msg)
 
-        store_bets(bets)
+        with self._lock:
+            store_bets(bets)
+
         logging.info(f'action: apuesta_recibida | result: success | cantidad: {len(bets)}')
 
     def _get_winners_for_agency(self, agency_id: int):
@@ -62,25 +88,26 @@ class Server:
         for a specific agency.
         """
         logging.info(f"action: get_winners_for_agency | result: in_progress | agency: {agency_id}")
-        print("ganadores por agencia:", self._winners_by_agency)
         return self._winners_by_agency.get(agency_id, [])
 
     def _handle_get_winners(self, client_sock, agency_id):
-        if len(self._finished_agencies) != self._expected_agencies:
-            protocol.send_message(client_sock, "ERROR:NOT_ALL_BATCHES_RECEIVED")
-            return
+        with self._lock:
+            if len(self._finished_agencies) != self._expected_agencies:
+                protocol.send_message(client_sock, "ERROR:NOT_ALL_BATCHES_RECEIVED")
+                return
 
-        winners = self._get_winners_for_agency(agency_id)
-        protocol.send_message(client_sock, encode_winners(winners))
-        logging.info(f"action: send_winners | result: success | agency: {agency_id}")
+            winners = self._get_winners_for_agency(agency_id)
+            protocol.send_message(client_sock, encode_winners(winners))
+            logging.info(f"action: send_winners | result: success | agency: {agency_id}")
 
     def _handle_end_of_batch(self, agency_id):
-        self._finished_agencies.add(agency_id)
-        logging.info(f"action: batch_end_received | result: success | agency: {agency_id}")
+        with self._lock:
+            self._finished_agencies.add(agency_id)
+            logging.info(f"action: batch_end_received | result: success | agency: {agency_id}")
 
-        if len(self._finished_agencies) >= self._expected_agencies:
-            logging.info("action: sorteo | result: success")
-            self._get_winners_by_agency()
+            if len(self._finished_agencies) >= self._expected_agencies:
+                logging.info("action: sorteo | result: success")
+                self._get_winners_by_agency()
 
     def __handle_client_connection(self, client_sock):
         """
@@ -107,16 +134,12 @@ class Server:
             protocol.send_ack(client_sock)
             logging.info(f'action: send_ack | result: success | ip: {addr[0]}')
 
-        # except (ValueError, IndexError) as e:
-        #     logging.error(f"action: apuesta_recibida | result: fail")
-        #     try:
-        #         protocol.send_message(client_sock, "ERROR")
-        #     except OSError:
-        #         pass
         except OSError as e:
             logging.error(f"action: apuesta_recibida | result: fail")
         finally:
             client_sock.close()
+            if client_sock in self._client_sockets:
+                self._client_sockets.remove(client_sock)
 
     def __accept_new_connection(self):
         """
@@ -137,14 +160,17 @@ class Server:
             except socket.timeout:
                 continue
         
-        return c
+        return None
     
     def __graceful_shutdown(self):
         
-        if self._client_sock:
-            self._client_sock.shutdown(socket.SHUT_RDWR)
-            self._client_sock.close()
-            logging.info('action: shutdown_client_socket | result: success')
+        for sock in self._client_sockets:
+            try:
+                sock.shutdown(socket.SHUT_RDWR)
+                sock.close()
+                logging.info('action: shutdown_client_socket | result: success')
+            except OSError:
+                pass
     
         if self._server_socket:
             self._server_socket.close()
