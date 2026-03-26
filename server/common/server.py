@@ -62,6 +62,7 @@ class Server:
         for a specific agency.
         """
         logging.info(f"action: get_winners_for_agency | result: in_progress | agency: {agency_id}")
+        print("ganadores por agencia:", self._winners_by_agency)
         return self._winners_by_agency.get(agency_id, [])
 
     def _handle_get_winners(self, client_sock, agency_id):
@@ -94,12 +95,12 @@ class Server:
                 self._handle_batch_bet(msg)
 
             if msg.startswith("GET_WINNERS"):
-                agency_id = msg.split(":", 1)[1].strip()
+                agency_id = int(msg.split(":", 1)[1].strip())
                 self._handle_get_winners(client_sock, agency_id)
                 return
             
             if msg.startswith("BATCH_END"):
-                agency_id = msg.split(":", 1)[1].strip()
+                agency_id = int(msg.split(":", 1)[1].strip())
                 self._handle_end_of_batch(agency_id)
 
             addr = client_sock.getpeername()
